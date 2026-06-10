@@ -1,14 +1,13 @@
-// lib/providers/product_provider.dart
 import 'package:flutter/material.dart';
 import '../models/product_model.dart';
-import '../models/stock_history_model.dart';
+// import '../models/stock_history_model.dart';  // 🔥 SEMENTARA DIKOMENTARI
+// import '../repositories/stock_repository.dart'; // 🔥 SEMENTARA DIKOMENTARI
 import '../repositories/product_repository.dart';
-import '../repositories/stock_repository.dart';
 
 class ProductProvider with ChangeNotifier {
   final ProductRepository _productRepo = ProductRepository();
-  final StockRepository _stockRepo = StockRepository();
-  
+  // final StockRepository _stockRepo = StockRepository(); // 🔥 DIKOMENTARI
+
   List<Product> _products = [];
   bool _isLoading = false;
   String? _errorMessage;
@@ -16,23 +15,30 @@ class ProductProvider with ChangeNotifier {
   List<Product> get products => _products;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  
+
   int get totalProducts => _products.length;
   int get totalStock => _products.fold(0, (sum, item) => sum + item.stock);
-  int get lowStockCount => _products.where((item) => item.stock <= item.minStock).length;
-  
+  int get lowStockCount =>
+      _products.where((item) => item.stock <= item.minStock).length;
+
   double get totalInventoryValueByCost {
-    return _products.fold(0.0, (sum, item) => sum + (item.stock * item.costPrice));
+    return _products.fold(
+      0.0,
+      (sum, item) => sum + (item.stock * item.costPrice),
+    );
   }
-  
+
   double get totalInventoryValueBySell {
-    return _products.fold(0.0, (sum, item) => sum + (item.stock * item.sellPrice));
+    return _products.fold(
+      0.0,
+      (sum, item) => sum + (item.stock * item.sellPrice),
+    );
   }
-  
+
   double get potentialProfit {
     return totalInventoryValueBySell - totalInventoryValueByCost;
   }
-  
+
   double get averageProfitMargin {
     if (totalInventoryValueByCost == 0) return 0;
     return (potentialProfit / totalInventoryValueByCost) * 100;
@@ -46,14 +52,11 @@ class ProductProvider with ChangeNotifier {
     });
   }
 
-  // Load all products - dipanggil pertama kali
   Future<void> loadProducts() async {
     if (_isLoading) return;
-    
     _isLoading = true;
     _errorMessage = null;
     _safeNotifyListeners();
-
     try {
       debugPrint('📦 ProductProvider: Loading products...');
       _products = await _productRepo.getAllProducts();
@@ -67,11 +70,9 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  // Force reload products - untuk refresh data
   Future<void> refreshProducts() async {
     _isLoading = true;
     _safeNotifyListeners();
-    
     try {
       debugPrint('🔄 ProductProvider: Refreshing products...');
       _products = await _productRepo.getAllProducts();
@@ -86,7 +87,6 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  // Get product by ID
   Product? getProductById(int id) {
     try {
       return _products.firstWhere((p) => p.id == id);
@@ -95,17 +95,18 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  // Add product (untuk manual add dari screen)
+  // 🔥 METHOD addProduct YANG SUDAH DIPERBAIKI (TANPA STOCKHISTORY)
   Future<bool> addProduct(Product product) async {
     if (_isLoading) return false;
-    
     _isLoading = true;
     _safeNotifyListeners();
 
     try {
       final id = await _productRepo.addProduct(product);
       debugPrint('➕ Product added with ID: $id');
-      
+
+      // 🔥 SEMENTARA DIKOMENTARI - FITUR STOCK HISTORY
+      /*
       if (product.stock > 0 && id > 0) {
         final stockMovement = StockHistory(
           id: null,
@@ -121,7 +122,8 @@ class ProductProvider with ChangeNotifier {
         );
         await _stockRepo.addStockMovement(stockMovement);
       }
-      
+      */
+
       await refreshProducts();
       return true;
     } catch (e) {
@@ -134,13 +136,10 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  // Add product direct dari transaksi (tanpa stock history tambahan)
   Future<int> addProductDirect(Product product) async {
     if (_isLoading) return 0;
-    
     _isLoading = true;
     _safeNotifyListeners();
-
     try {
       final id = await _productRepo.addProduct(product);
       debugPrint('➕ Product direct added with ID: $id');
@@ -155,13 +154,10 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  // Update product
   Future<bool> updateProduct(Product product) async {
     if (_isLoading) return false;
-    
     _isLoading = true;
     _safeNotifyListeners();
-
     try {
       await _productRepo.updateProduct(product);
       await refreshProducts();
@@ -175,7 +171,6 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  // Update product stock locally
   void updateProductStockLocally(int productId, int newStock) {
     final index = _products.indexWhere((p) => p.id == productId);
     if (index != -1) {
@@ -185,13 +180,10 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  // Delete product
   Future<bool> deleteProduct(int id) async {
     if (_isLoading) return false;
-    
     _isLoading = true;
     _safeNotifyListeners();
-
     try {
       await _productRepo.deleteProduct(id);
       await refreshProducts();
@@ -205,12 +197,10 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  // Get low stock products
   Future<List<Product>> getLowStockProducts() async {
     return await _productRepo.getLowStockProducts();
   }
-  
-  // Reset provider
+
   void reset() {
     _products = [];
     _isLoading = false;
