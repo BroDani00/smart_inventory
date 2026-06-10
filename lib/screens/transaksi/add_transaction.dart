@@ -64,6 +64,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   void initState() {
     super.initState();
+    // Load data setelah frame selesai
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitialData();
     });
@@ -75,6 +76,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     try {
       final isPurchase = widget.transactionType == 'Pembelian';
 
+      // Load suppliers jika untuk pembelian
       if (isPurchase) {
         final supplierProvider = Provider.of<SupplierProvider>(
           context,
@@ -85,6 +87,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         }
       }
 
+      // Load products
       final productProvider = Provider.of<ProductProvider>(
         context,
         listen: false,
@@ -120,6 +123,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final isPurchase = widget.transactionType == 'Pembelian';
     final title = isPurchase ? 'Tambah Pembelian' : 'Tambah Penjualan';
 
+    // Jika masih loading
     if (_isLoading) {
       return Scaffold(
         backgroundColor: isDark
@@ -149,54 +153,76 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         ],
       ),
       body: _isSubmitting
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isDark ? AppColors.accentDark : AppColors.accentLight,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Memproses transaksi...',
-                    style: GoogleFonts.plusJakartaSans(
-                      color: isDark ? AppColors.textLight : AppColors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeaderCard(isDark, isPurchase),
-                    const SizedBox(height: 16),
-                    if (isPurchase && suppliers.isNotEmpty)
-                      _buildSupplierSection(isDark, suppliers),
-                    if (!isPurchase) _buildCustomerSection(isDark),
-                    const SizedBox(height: 16),
-                    _buildProductsSection(isDark, products, isPurchase),
-                    const SizedBox(height: 16),
-                    if (_items.isNotEmpty) ...[
-                      _buildSelectedItemsList(isDark),
-                      const SizedBox(height: 16),
-                    ],
-                    _buildPaymentSection(isDark),
-                    const SizedBox(height: 16),
-                    _buildNotesSection(isDark),
-                    const SizedBox(height: 24),
-                    _buildSubmitButton(isDark, isPurchase),
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
+          ? _buildLoadingIndicator(isDark)
+          : _buildForm(isDark, products, suppliers, isPurchase),
+    );
+  }
+
+  Widget _buildLoadingIndicator(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(
+              isDark ? AppColors.accentDark : AppColors.accentLight,
             ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Memproses transaksi...',
+            style: GoogleFonts.plusJakartaSans(
+              color: isDark ? AppColors.textLight : AppColors.textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildForm(
+    bool isDark,
+    List<Product> products,
+    List<Supplier> suppliers,
+    bool isPurchase,
+  ) {
+    return Form(
+      key: _formKey,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeaderCard(isDark, isPurchase),
+            const SizedBox(height: 16),
+
+            // Supplier Section (hanya untuk PEMBELIAN)
+            if (isPurchase && suppliers.isNotEmpty)
+              _buildSupplierSection(isDark, suppliers),
+
+            // Customer Section (hanya untuk PENJUALAN)
+            if (!isPurchase) _buildCustomerSection(isDark),
+
+            const SizedBox(height: 16),
+
+            // Products Section
+            _buildProductsSection(isDark, products, isPurchase),
+            const SizedBox(height: 16),
+
+            if (_items.isNotEmpty) ...[
+              _buildSelectedItemsList(isDark),
+              const SizedBox(height: 16),
+            ],
+
+            _buildPaymentSection(isDark),
+            const SizedBox(height: 16),
+            _buildNotesSection(isDark),
+            const SizedBox(height: 24),
+            _buildSubmitButton(isDark, isPurchase),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
     );
   }
 
@@ -293,8 +319,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               color: isDark ? Colors.white : AppColors.primaryLight,
             ),
             validator: (value) {
-              if (value == null || value.isEmpty)
+              if (value == null || value.isEmpty) {
                 return 'Nama customer harus diisi';
+              }
               return null;
             },
           ),
@@ -356,17 +383,23 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             style: GoogleFonts.plusJakartaSans(
               color: isDark ? Colors.white : AppColors.primaryLight,
             ),
-            items: suppliers
-                .map(
-                  (supplier) => DropdownMenuItem(
-                    value: supplier,
-                    child: Text(supplier.name),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) => setState(() => _selectedSupplier = value),
-            validator: (value) =>
-                value == null ? 'Supplier harus dipilih' : null,
+            items: suppliers.map((supplier) {
+              return DropdownMenuItem(
+                value: supplier,
+                child: Text(supplier.name),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedSupplier = value;
+              });
+            },
+            validator: (value) {
+              if (value == null) {
+                return 'Supplier harus dipilih';
+              }
+              return null;
+            },
           ),
         ],
       ),
@@ -378,6 +411,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     List<Product> products,
     bool isPurchase,
   ) {
+    // Untuk penjualan, hanya tampilkan produk yang punya stok > 0
     final availableProducts = isPurchase
         ? products
         : products.where((p) => p.stock > 0).toList();
@@ -388,6 +422,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Row(
             children: [
               Icon(
@@ -406,17 +441,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
             ],
           ),
+
           const SizedBox(height: 12),
 
+          // Pilihan mode (hanya untuk pembelian)
           if (isPurchase && products.isNotEmpty) ...[
             Row(
               children: [
                 Expanded(
                   child: _buildRadioOption(
-                    isDark,
-                    'Pilih produk yang sudah ada',
-                    !_isAddingNewProduct,
-                    () {
+                    isDark: isDark,
+                    title: 'Pilih produk yang sudah ada',
+                    isSelected: !_isAddingNewProduct,
+                    onTap: () {
                       setState(() {
                         _isAddingNewProduct = false;
                         _selectedProduct = null;
@@ -425,12 +462,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     },
                   ),
                 ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _buildRadioOption(
-                    isDark,
-                    'Tambah produk baru',
-                    _isAddingNewProduct,
-                    () {
+                    isDark: isDark,
+                    title: 'Tambah produk baru',
+                    isSelected: _isAddingNewProduct,
+                    onTap: () {
                       setState(() {
                         _isAddingNewProduct = true;
                         _selectedProduct = null;
@@ -443,72 +481,75 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             const SizedBox(height: 12),
           ],
 
+          // Dropdown produk
           if (!_isAddingNewProduct || !isPurchase)
             DropdownButtonFormField<Product>(
               value: _selectedProduct,
-              menuMaxHeight: 300, // 🔥 PERBAIKAN OVERFLOW
-              isExpanded: true, // 🔥 PERBAIKAN OVERFLOW
-              decoration: InputDecoration(
-                labelText: 'Pilih Produk',
-                prefixIcon: const Icon(
-                  Icons.production_quantity_limits_rounded,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: isDark ? Colors.white24 : Colors.black12,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: isDark ? Colors.white24 : Colors.black12,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.accentLight),
-                ),
-                filled: true,
-                fillColor: isDark ? AppColors.cardDark : Colors.white,
-              ),
-              style: GoogleFonts.plusJakartaSans(
-                color: isDark ? Colors.white : AppColors.primaryLight,
-              ),
+              isExpanded: true,
+              menuMaxHeight: 350,
+
+              selectedItemBuilder: (BuildContext context) {
+                return availableProducts.map((product) {
+                  final price = isPurchase
+                      ? product.costPrice
+                      : product.sellPrice;
+
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${product.name} • Stok: ${product.stock} • ${_formatRupiah(price)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: isDark ? Colors.white : AppColors.primaryLight,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                }).toList();
+              },
+
               items: availableProducts.map((product) {
                 final price = isPurchase
                     ? product.costPrice
                     : product.sellPrice;
-                return DropdownMenuItem(
+
+                return DropdownMenuItem<Product>(
                   value: product,
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 10),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           product.name,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontWeight: FontWeight.w500,
-                          ),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
-                          'Stok: ${product.stock} | Harga: ${_formatRupiah(price)}',
+                          'Stok: ${product.stock} • ${_formatRupiah(price)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 11,
                             color: isDark
                                 ? AppColors.textLight
                                 : AppColors.textMuted,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
                 );
               }).toList(),
+
               onChanged: (value) {
                 setState(() {
                   _selectedProduct = value;
@@ -520,14 +561,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   }
                 });
               },
-              hint: Text(
-                availableProducts.isEmpty ? 'Belum ada produk' : 'Pilih produk',
-                style: GoogleFonts.plusJakartaSans(
-                  color: isDark ? AppColors.textLight : AppColors.textMuted,
-                ),
-              ),
             ),
 
+          // Form tambah produk baru
           if (isPurchase && _isAddingNewProduct) ...[
             const SizedBox(height: 8),
             _buildNewProductForm(isDark),
@@ -535,7 +571,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
           const SizedBox(height: 12),
 
+          // Input jumlah, harga, dan tombol tambah
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
                 child: TextFormField(
@@ -583,12 +621,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
+                    elevation: 0,
+                    minimumSize: const Size(52, 54),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
                     ),
                   ),
                   child: const Icon(Icons.add_rounded, color: Colors.white),
@@ -601,12 +637,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildRadioOption(
-    bool isDark,
-    String title,
-    bool isSelected,
-    VoidCallback onTap,
-  ) {
+  Widget _buildRadioOption({
+    required bool isDark,
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -735,6 +771,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   Widget _buildSelectedItemsList(bool isDark) {
     final subtotal = _getTotalAmount();
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _buildCardDecoration(isDark),
@@ -765,8 +802,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _items.length,
             separatorBuilder: (_, __) => const Divider(height: 8),
-            itemBuilder: (context, index) =>
-                _buildListItem(isDark, _items[index], index),
+            itemBuilder: (context, index) {
+              final item = _items[index];
+              return _buildListItem(isDark, item, index);
+            },
           ),
           const SizedBox(height: 12),
           Container(
@@ -805,7 +844,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  // 🔥 PERBAIKAN OVERFLOW PADA LIST ITEM
   Widget _buildListItem(bool isDark, TransactionItem item, int index) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -833,7 +871,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   item.productName ?? 'Produk',
@@ -841,8 +878,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     fontWeight: FontWeight.w600,
                     color: isDark ? Colors.white : AppColors.primaryLight,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   '${item.quantity} x ${_formatRupiah(item.unitPrice)}',
@@ -850,8 +885,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     fontSize: 12,
                     color: isDark ? AppColors.textLight : AppColors.textMuted,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 if (item.productCode != null)
                   Text(
@@ -860,8 +893,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       fontSize: 10,
                       color: isDark ? AppColors.textLight : AppColors.textMuted,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
               ],
             ),
@@ -942,13 +973,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             style: GoogleFonts.plusJakartaSans(
               color: isDark ? Colors.white : AppColors.primaryLight,
             ),
-            items: _paymentMethods
-                .map(
-                  (method) =>
-                      DropdownMenuItem(value: method, child: Text(method)),
-                )
-                .toList(),
-            onChanged: (value) => setState(() => _paymentMethod = value!),
+            items: _paymentMethods.map((method) {
+              return DropdownMenuItem(value: method, child: Text(method));
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _paymentMethod = value!;
+              });
+            },
           ),
         ],
       ),
@@ -1004,6 +1036,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         (isPurchase
             ? _selectedSupplier != null
             : _customerNameController.text.isNotEmpty);
+
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
@@ -1103,11 +1136,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final isPurchase = widget.transactionType == 'Pembelian';
     final quantity = int.tryParse(_quantityController.text);
     final unitPrice = double.tryParse(_priceController.text);
+
     if (quantity == null || unitPrice == null) return;
 
-    int productId;
     String productName;
     String productCode;
+    int productId;
     String? category;
     double? sellPrice;
 
@@ -1125,6 +1159,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       sellPrice = _selectedProduct!.sellPrice;
     }
 
+    // Cek apakah produk sudah ada di list
     final existingIndex = _items.indexWhere(
       (item) => item.productId == productId,
     );
@@ -1134,6 +1169,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         final existingItem = _items[existingIndex];
         final newQuantity = existingItem.quantity + quantity;
         final newSubtotal = newQuantity * existingItem.unitPrice;
+
         _items[existingIndex] = TransactionItem(
           id: existingItem.id,
           transactionId: existingItem.transactionId,
@@ -1159,6 +1195,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         );
       }
 
+      // Simpan data produk baru untuk digunakan saat submit
       if (isPurchase && _isAddingNewProduct) {
         _pendingNewProducts[productId] = {
           'code': productCode,
@@ -1170,6 +1207,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         };
       }
 
+      // Clear form
       _quantityController.clear();
       _priceController.clear();
 
@@ -1186,7 +1224,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final item = _items[index];
     setState(() {
       _items.removeAt(index);
-      if (item.productId < 0) _pendingNewProducts.remove(item.productId);
+      if (item.productId < 0) {
+        _pendingNewProducts.remove(item.productId);
+      }
     });
   }
 
@@ -1223,10 +1263,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _newProductSellPriceController.clear();
   }
 
-  double _getTotalAmount() =>
-      _items.fold(0, (sum, item) => sum + item.subtotal);
-  String _formatRupiah(double amount) =>
-      'Rp ${NumberFormat('#,###').format(amount)}';
+  double _getTotalAmount() {
+    return _items.fold(0, (sum, item) => sum + item.subtotal);
+  }
+
+  String _formatRupiah(double amount) {
+    return 'Rp ${NumberFormat('#,###').format(amount)}';
+  }
 
   Future<void> _submitTransaction() async {
     final isPurchase = widget.transactionType == 'Pembelian';
@@ -1235,16 +1278,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _showSnackBar('Pilih supplier terlebih dahulu', Colors.orange);
       return;
     }
+
     if (!isPurchase && _customerNameController.text.isEmpty) {
       _showSnackBar('Masukkan nama customer', Colors.orange);
       return;
     }
+
     if (_items.isEmpty) {
       _showSnackBar('Tambahkan minimal 1 produk', Colors.orange);
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+    });
 
     try {
       final transactionProvider = Provider.of<TransactionProvider>(
@@ -1252,10 +1299,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         listen: false,
       );
       final notes = _notesController.text;
+
       bool success;
 
       if (isPurchase) {
         final newProducts = _pendingNewProducts.values.toList();
+
         success = await transactionProvider
             .createPurchaseTransactionWithNewProducts(
               supplierId: _selectedSupplier!.id!,
@@ -1285,11 +1334,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           listen: false,
         );
         await productProvider.refreshProducts();
+
         final stockProvider = Provider.of<StockProvider>(
           context,
           listen: false,
         );
         await stockProvider.refreshStockHistory();
+
         if (mounted) {
           _showSnackBar(
             isPurchase
@@ -1305,9 +1356,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         );
       }
     } catch (e) {
-      if (mounted) _showSnackBar('Error: ${e.toString()}', Colors.red);
+      if (mounted) {
+        _showSnackBar('Error: ${e.toString()}', Colors.red);
+      }
     } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
